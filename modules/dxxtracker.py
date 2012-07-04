@@ -281,9 +281,9 @@ def known_game(games, game):
 	return known_game_same_attr(games, game, attr)
 
 # make a string from a game description	
-# used when we detect new/vanished games
+# used when we detect a new games
 def game_string_new(game):
-	g='\x0304NEW GAME\x03 %sx-%s: %s %s in %s(%s) at %sx://%s:%s (%s)' % \
+	g='\x0312NEW GAME\x0302 %sx-%s: %s %s in %s(%s) at %sx://%s:%s (%s)\x03 ' % \
 		(getd(game,'game'), getd(game,'version'),
 		 getd(game,'name'), getd(game,'mode'),
 		 getd(game,'missiontitle'), getd(game,'missionlevel'),
@@ -292,9 +292,9 @@ def game_string_new(game):
 	return g
 
 # make a string from a game description	
-# used when we detect new/vanished games
-def game_string_valished(game):
-	g='\x0315game has ended %sx %s %s in %s(%s)\x03 ' % \
+# used when we detect that a game has ended
+def game_string_end(game):
+	g='\x0314game has ended %sx %s %s in %s(%s)\x03 ' % \
 		(getd(game,'game'),
 		 getd(game,'name'), getd(game,'mode'),
 		 getd(game,'missiontitle'), getd(game,'missionlevel'))
@@ -304,7 +304,7 @@ def game_string_valished(game):
 # make a string from a game description	
 # used when we list the games	
 def game_string_list(game):
-	g='%sx-%s: %s %s in %s(%s) at %sx://%s:%s (%s) players: %s difficulty: %s status: %s, disovered at %s' % \
+	g='\x02%sx-%s\x02: \x02%s\x02 \x02%s\x02 in \x02%s\x02(\x02%s\x02) at \x02%sx://%s:%s\x02 (\x02%s\x02), players: \x02%s\x02, difficulty: \x02%s\x02, status: \x02%s\x02, disovered at \x02%s\x02' % \
 		(getd(game,'game'), getd(game,'version'),
 		 getd(game,'name'), getd(game,'mode'),
 		 getd(game,'missiontitle'), getd(game,'missionlevel'),
@@ -530,7 +530,7 @@ def do_update(ctx):
 	 	ctx.reply('Tracker seems to be available again.')
 	 	
 	for g in v:
-		ctx.reply(game_string_valished(g))	
+		ctx.reply(game_string_end(g))	
 	for g in n:
 		ctx.reply(game_string_new(g))
 	if client.failed:
