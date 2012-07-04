@@ -364,6 +364,10 @@ class dxxtracker_client:
 		self.fake=False;
 		self.locate_ip=True;
 		self.cur_time='';
+		self.now=time.time()
+		self.history=list()
+		self.history_seconds=7*24*60*60
+		self.gamecount=0
 		# custom headers for HTTP request
 		self.headers={"User-Agent": "Schongo Bot dxxtracker client"}
 
@@ -382,6 +386,9 @@ class dxxtracker_client:
 		else:
 			self.locate_ip=False
 
+	def set_history_seconds(self,arg):
+		self.history_seconds=arg	
+
 	def fail(self,reason):
 		if not self.failed:
 			self.failed=True
@@ -399,6 +406,7 @@ class dxxtracker_client:
 
 	def query(self):
 		self.poll_count += 1
+		self.now=time.time()
 		self.cur_time=time.strftime("%d %b %Y %H:%M:%S GMT", time.gmtime())
 		if self.fake:
 			return self.query_fake()
@@ -414,12 +422,34 @@ class dxxtracker_client:
 
 	def enrich_gamedata(self,game):
 		game['discovered']=self.cur_time;
+		game['timestamp']=self.now;
 		if self.locate_ip:
 			if 'ip' in game:
 				game['country']=get_country(game['ip'])
 			else:
 				game['country']='[UNKNOWN]'
 		return game
+
+	def clean_history(self):
+		while len(self.history) > 0 and self.now - self.history[0]['timestamp'] > self.history_seconds:
+			del self.history[0]
+
+	def charts(self,attribute,cnt):
+		histogram=dict()
+		for g in self.history:
+			if attribute in g:
+				attr=g[attribute]
+				if attr in histogram:
+					histogram[attr]=histogram[attr]+1
+				else:
+					histogram[attr]=1
+		l=list()
+		for e in histogram:
+			l.append((e,histogram[e]))
+		l.sort(key=lambda x: x[1],reverse=True)	
+		if len(l)>cnt:
+			l=l[:cnt] 
+		return l	
 
 	def update(self,response):
 		self.lost=False
@@ -441,6 +471,8 @@ class dxxtracker_client:
 				if old_game == None:
 					g=self.enrich_gamedata(g)
 					new_games.append(g)
+					self.history.append(g)
+					self.gamecount=self.gamecount+1
 					games.append(g)
 				else:
 					# old_game is already enriched
@@ -452,6 +484,8 @@ class dxxtracker_client:
 			# update current list of games
 			self.games=games
 			self.success()
+			# remove old games from the history
+			self.clean_history()
 		except:
 			self.parse_error += 1
 			self.fail('parse error')
@@ -503,10 +537,35 @@ def do_update(ctx):
  		print ('update: failed to get data from tracker')
 	print('update: found %d new games, %d closed games' % (len(n),len(v)) )	
 
+# request charts
+def do_charts(ctx,args):
+	arg=args.split()
+	if len(arg)>0:
+		attribute=arg[0]
+	else:
+		attribute='missiontitle'
+	if len(arg)>1:
+		cnt=int(arg[1])
+	else:
+		cnt=5
+	l=client.charts(attribute,cnt)
+	if (len(l) < 1):
+		reply='Sorry, no data for charts request'
+	else :
+		reply='Top %d by %s: ' % (len(l),attribute)
+		i=1
+		for e in l:
+			if i > 1:
+				reply = reply+'| '
+			reply=reply + '%d. %s (%d) ' % (i,e[0],e[1])
+			i=i+1
+	ctx.reply(reply)	 
+
+
 # reply with current status	
 def do_status(ctx):
 	print('status')
-	ctx.reply('number of games: %d' % len(client.games)) 
+	ctx.reply('number of games: current: %d, in history: %d, total: %d' % (len(client.games),len(client.history), client.gamecount)) 
 	ctx.reply('number of polls: %d, failed requests: %d, parse errors: %d' % (client.poll_count, client.request_error, client.parse_error))
 	if client.failed:
 		ctx.reply('tracker seems NOT to be availbale')
@@ -523,6 +582,7 @@ def onLoad():
 	client.set_url(cfg.get("url"))
 	client.set_fake(cfg.get("fake"))
 	client.set_locate_ip(cfg.get("locate_ip"))
+	client.set_history_seconds(float(cfg.get("history_seconds")))
 
 	@timer(int(cfg.get("interval")), True)
 	def update_timer(ctx):
@@ -532,6 +592,10 @@ def onLoad():
 	@command("games")
 	def games_cmd(ctx, cmd, args):
 		do_list(ctx, args)
+
+	@command("charts")
+	def charts_cmd(ctx, cmd, args):
+		do_charts(ctx, args)	
 
 	# Update command is now uselsess as the timer is working
 	# do not support it as las a user could try to exploit this to
