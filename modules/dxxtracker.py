@@ -271,6 +271,18 @@ def known_game_same_attr(games, game, attrlist):
 			attributes[a]=game[a]
 	return known_game_by_attr(games,attributes)
 
+# Extract all the requested attributes from a game
+# And return it as a string
+def game_desc_by_attrlist(game, attrlist):
+	desc=''
+	i=0
+	for attr in attrlist:
+		if i > 0:	
+			desc = desc + ' - '
+		desc = desc + getd(game, attr)	
+		i=i+1
+	return desc
+
 # check if we already know about a game	
 # we identify a game by a set of certain attributes defined
 # here. We do not want to detect a game as new if just the
@@ -434,15 +446,14 @@ class dxxtracker_client:
 		while len(self.history) > 0 and self.now - self.history[0]['timestamp'] > self.history_seconds:
 			del self.history[0]
 
-	def charts(self,attribute,cnt):
+	def charts(self,attributes,cnt):
 		histogram=dict()
 		for g in self.history:
-			if attribute in g:
-				attr=g[attribute]
-				if attr in histogram:
-					histogram[attr]=histogram[attr]+1
-				else:
-					histogram[attr]=1
+			attr=game_desc_by_attrlist(g,attributes)
+			if attr in histogram:
+				histogram[attr]=histogram[attr]+1
+			else:
+				histogram[attr]=1
 		l=list()
 		for e in histogram:
 			l.append((e,histogram[e]))
@@ -541,18 +552,27 @@ def do_update(ctx):
 def do_charts(ctx,args):
 	arg=args.split()
 	if len(arg)>0:
-		attribute=arg[0]
+		attributes=[arg[0]]
 	else:
-		attribute='missiontitle'
+		attributes=['missiontitle',"missionlevel","mode"]
 	if len(arg)>1:
 		cnt=int(arg[1])
 	else:
 		cnt=5
-	l=client.charts(attribute,cnt)
+	l=client.charts(attributes,cnt)
 	if (len(l) < 1):
 		reply='Sorry, no data for charts request'
 	else :
-		reply='Top %d by %s: ' % (len(l),attribute)
+		reply='Top %d by ' % len(l)
+		i=1
+		for a in attributes:
+			if i > 1:
+				reply = reply + ' and '
+			reply = reply + a
+			i=i+1
+		reply=reply+':'
+		ctx.reply(reply)
+		reply=''
 		i=1
 		for e in l:
 			if i > 1:
